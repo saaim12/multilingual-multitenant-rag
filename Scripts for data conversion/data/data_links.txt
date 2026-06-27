@@ -1,0 +1,9 @@
+The raw MKQA dataset is not included in this repo (it's large, externally licensed, and freely downloadable). Download it yourself before running:
+
+Official source (Apple): https://github.com/apple/ml-mkqa
+Direct file: https://github.com/apple/ml-mkqa/raw/main/dataset/mkqa.jsonl.gz
+HuggingFace mirror: https://huggingface.co/datasets/apple/mkqa
+The file ships gzipped (mkqa.jsonl.gz). Unzip it to mkqa.jsonl and place it in Scripts for data conversion/data/ before running.
+
+Dataset: MKQA — 10,000 questions aligned across 26 languages. Citation: Longpre, Lu, Daiber. MKQA: A Linguistically Diverse Benchmark for Multilingual Open Domain Question Answering (2020).
+
