@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "pgvector",
     "documents",
+    "drf_spectacular",
 ]
 
 DATABASES = {
@@ -57,6 +58,22 @@ TEMPLATES = [
         },
     },
 ]
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",   # ← add
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Multilingual Multi-Tenant RAG API",
+    "DESCRIPTION": "RAG engine with tenant isolation, multilingual search, and grounded answers.",
+    "VERSION": "1.0.0",
+}
 ROOT_URLCONF = "core.urls"
 WSGI_APPLICATION = "core.wsgi.application"
+STATIC_URL = "static/"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

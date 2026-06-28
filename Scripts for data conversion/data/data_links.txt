@@ -7,3 +7,4 @@ The file ships gzipped (mkqa.jsonl.gz). Unzip it to mkqa.jsonl and place it in S
 
 Dataset: MKQA — 10,000 questions aligned across 26 languages. Citation: Longpre, Lu, Daiber. MKQA: A Linguistically Diverse Benchmark for Multilingual Open Domain Question Answering (2020).
 
+i have used 500 rows only fo rhti project for demonstration
