@@ -1,0 +1,144 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Engine</title>
+  <link rel="stylesheet" href="{% static 'style.css' %}" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     AUTH SCREEN  (login + register tabs)
+════════════════════════════════════════════════════════════════ -->
+<div id="auth-screen" class="screen">
+  <div class="auth-card">
+    <h1 class="brand">🔍 RAG Engine</h1>
+    <p class="brand-sub">Multilingual · Multi-Tenant</p>
+
+    <div class="tab-bar">
+      <button class="tab active" data-tab="login">Login</button>
+      <button class="tab" data-tab="register">Register</button>
+    </div>
+
+    <!-- Login form -->
+    <form id="login-form" class="auth-form">
+      <label>Username
+        <input type="text" id="login-username" autocomplete="username" required />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" autocomplete="current-password" required />
+      </label>
+      <button type="submit" class="btn-primary">Sign in</button>
+      <p id="login-error" class="error-msg"></p>
+    </form>
+
+    <!-- Register form -->
+    <form id="register-form" class="auth-form hidden">
+      <label>Username
+        <input type="text" id="reg-username" autocomplete="username" required />
+      </label>
+      <label>Email
+        <input type="email" id="reg-email" autocomplete="email" required />
+      </label>
+      <label>Password
+        <input type="password" id="reg-password" autocomplete="new-password" required />
+      </label>
+      <button type="submit" class="btn-primary">Create account</button>
+      <p id="reg-error" class="error-msg"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DASHBOARD  (auth-gated)
+════════════════════════════════════════════════════════════════ -->
+<div id="app-screen" class="screen hidden">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <span class="topbar-brand">🔍 RAG Engine</span>
+    <span id="tenant-badge" class="tenant-badge"></span>
+    <div class="topbar-right">
+      <span id="header-username" class="header-username"></span>
+      <button id="logout-btn" class="btn-ghost">Logout</button>
+    </div>
+  </header>
+
+  <main class="main-grid">
+
+    <!-- ── Left column ── -->
+    <aside class="sidebar">
+
+      <!-- Usage widget -->
+      <section class="card usage-card">
+        <h2>Usage</h2>
+        <div id="usage-loading" class="spinner-sm"></div>
+        <div id="usage-content" class="hidden">
+          <div class="usage-numbers">
+            <span id="usage-used">–</span> / <span id="usage-quota">–</span>
+          </div>
+          <div class="progress-track">
+            <div id="usage-bar" class="progress-bar"></div>
+          </div>
+          <p id="usage-remaining" class="usage-remaining"></p>
+        </div>
+      </section>
+
+      <!-- Upload panel -->
+      <section class="card upload-card">
+        <h2>Upload CSV</h2>
+        <p class="hint">CSV must have columns: <code>name, category, question, answer</code></p>
+        <label class="file-label" id="file-label">
+          <input type="file" id="csv-file" accept=".csv" />
+          <span>Choose file…</span>
+        </label>
+        <div id="file-summary" class="file-summary hidden"></div>
+        <button id="upload-btn" class="btn-primary" disabled>Upload</button>
+        <div id="upload-status" class="upload-status"></div>
+      </section>
+
+    </aside>
+
+    <!-- ── Right column — Query panel ── -->
+    <section class="card query-card">
+      <h2>Ask a Question</h2>
+
+      <div class="query-controls">
+        <label class="label-sm">Template
+          <select id="template-select">
+            <option value="qa">Q&amp;A (default)</option>
+            <option value="summarize">Summarize</option>
+            <option value="translate">Translate</option>
+            <option value="glossary">Glossary</option>
+            <option value="extract">Extract</option>
+            <option value="explain">Explain</option>
+          </select>
+        </label>
+      </div>
+
+      <textarea id="query-input" rows="4"
+        placeholder="Ask anything about your documents…"></textarea>
+      <button id="query-btn" class="btn-primary">Ask</button>
+
+      <div id="query-spinner" class="spinner hidden"></div>
+      <div id="query-error" class="error-msg"></div>
+
+      <div id="answer-block" class="answer-block hidden">
+        <h3>Answer</h3>
+        <div id="answer-text" class="answer-text"></div>
+
+        <details id="sources-details" class="sources">
+          <summary>Sources (<span id="source-count">0</span>)</summary>
+          <ul id="sources-list"></ul>
+        </details>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="{% static 'app.js' %}"></script>
+</body>
+</html>

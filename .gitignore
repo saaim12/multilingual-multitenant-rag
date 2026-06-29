@@ -92,3 +92,8 @@ Thumbs.db
 desktop.ini
 
 Scripts for data conversion/data/mkqa.jsonl
+
+# Sentence-transformer model cache
+sentence_transformers/
+huggingface/
+~/.cache/huggingface/

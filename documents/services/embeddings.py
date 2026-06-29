@@ -35,6 +35,13 @@ def embed_query(text: str) -> list[float]:
     return vec.tolist()
 
 
+def embed_documents_batch(texts: list[str]) -> list[list[float]]:
+    """Batch-embed multiple documents in one model call (much faster than one by one)."""
+    prefixed = [f"passage: {t}" for t in texts]
+    vecs = _get_model().encode(prefixed, normalize_embeddings=True, batch_size=32)
+    return [v.tolist() for v in vecs]
+
+
 # embed_document → used when storing your data (ingestion). Every CSV row's text becomes a "bus stop" on the map and gets saved in the DB. You run this once when loading data.
 # embed_query → used when someone asks a question (the API call). Their question becomes a "person" looking for nearby bus stops. You run this every time a query comes in.
 # So:

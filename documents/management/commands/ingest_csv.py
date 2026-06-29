@@ -17,7 +17,7 @@ class Command(BaseCommand):
         tenant_name = options["tenant"]
 
         self.stdout.write(f"Ingesting {path} for tenant '{tenant_name}' ...")
-        count = ingest_csv(path, tenant_name)
+        result = ingest_csv(path, tenant_name)
         self.stdout.write(self.style.SUCCESS(
-            f"Done. {count} chunks ingested for '{tenant_name}'."
+            f"Done. {result['created']} chunks created, {result['skipped']} skipped for '{tenant_name}'."
         ))

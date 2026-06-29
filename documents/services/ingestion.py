@@ -1,50 +1,80 @@
 import csv
+import logging
 import os
-from documents.models import Tenant, DocumentChunk
-from documents.services.embeddings import embed_document
+
+from documents.models import DocumentChunk, Tenant
+from documents.services.embeddings import embed_documents_batch
+
+logger = logging.getLogger(__name__)
+
+REQUIRED_COLUMNS = {"name", "category", "question", "answer"}
 
 
-def ingest_csv(file_path: str, tenant_name: str) -> int:
+def ingest_csv(file_path: str, tenant_name: str, source_name: str = None) -> dict:
     """
     Load one CSV into the database under a given tenant.
 
-    Steps:
-      1. Find or create the tenant (the company that owns this data).
-      2. Read each CSV row (name, category, question, answer).
-      3. Combine question + answer into one 'content' string.
-      4. Turn content into a vector (embedding).
-      5. Save it all as a DocumentChunk row tied to the tenant.
+    Returns a dict: {"created": int, "skipped": int}
+
+    Idempotency: existing chunks for (tenant, source) are deleted first so
+    re-uploading the same file replaces rather than duplicates data.
+
+    Validation: rows missing required columns are skipped and counted.
+
+    Batch embedding: all valid rows are embedded in one model call.
     """
+    tenant, _ = Tenant.objects.get_or_create(name=tenant_name)
+    source = source_name or os.path.basename(file_path)
 
-#    Tenant.objects.get_or_create(name=tenant_name)
-# This is the tenant magic. It checks: "does a tenant named 'Acme Translations' already exist?"
-# If yes → use it.
-# If no → create it.
-    tenant, created = Tenant.objects.get_or_create(name=tenant_name)
+    rows_data = []
+    skipped = 0
 
-    source = os.path.basename(file_path)  # e.g. "tenant_acme_es.csv"
-    objects = []
-
-    # 2. Read the CSV
     with open(file_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)  # reads rows as dicts: row["question"], etc.
-        for row in reader:
-            # 3. Combine question + answer into the searchable text
-            content = f"Q: {row['question'].strip()}\nA: {row['answer'].strip()}"
+        reader = csv.DictReader(f)
 
-            # 4. Turn that text into a vector (a "bus stop" on the meaning-map)
-            embedding = embed_document(content)
+        # Validate header
+        if reader.fieldnames is None or not REQUIRED_COLUMNS.issubset(set(reader.fieldnames)):
+            missing = REQUIRED_COLUMNS - set(reader.fieldnames or [])
+            raise ValueError(f"CSV is missing required columns: {missing}")
 
-            # 5. Build the DB row (not saved yet — collected for bulk insert)
-            objects.append(DocumentChunk(
-                tenant=tenant,
-                source=source,
-                category=row.get("category", "").strip(),
-                content=content,# conetnt is both question and answer
-                embedding=embedding,
-                metadata={"name": row.get("name", "").strip()},
-            ))
+        for i, row in enumerate(reader, start=2):  # row 1 is header
+            try:
+                question = row["question"].strip()
+                answer = row["answer"].strip()
+                if not question or not answer:
+                    raise ValueError("empty question or answer")
+                rows_data.append({
+                    "content": f"Q: {question}\nA: {answer}",
+                    "category": row.get("category", "").strip(),
+                    "name": row.get("name", "").strip(),
+                })
+            except Exception as exc:
+                logger.warning("Skipping row %d in %s: %s", i, source, exc)
+                skipped += 1
 
-    # Save all rows at once (much faster than saving one by one)
+    if not rows_data:
+        return {"created": 0, "skipped": skipped}
+
+    # Idempotency: delete existing chunks for this (tenant, source) before inserting
+    deleted, _ = DocumentChunk.objects.filter(tenant=tenant, source=source).delete()
+    if deleted:
+        logger.info("Replaced %d existing chunks for source '%s'", deleted, source)
+
+    # Batch embed — one model call for all rows (much faster)
+    texts = [r["content"] for r in rows_data]
+    embeddings = embed_documents_batch(texts)
+
+    objects = [
+        DocumentChunk(
+            tenant=tenant,
+            source=source,
+            category=r["category"],
+            content=r["content"],
+            embedding=emb,
+            metadata={"name": r["name"]},
+        )
+        for r, emb in zip(rows_data, embeddings)
+    ]
+
     DocumentChunk.objects.bulk_create(objects)
-    return len(objects)
+    return {"created": len(objects), "skipped": skipped}

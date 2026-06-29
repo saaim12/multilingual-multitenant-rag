@@ -1,51 +1,54 @@
 import os
+import time
+import logging
 from google import genai
-from documents.models import Tenant
 from documents.services.retrieval import retrieve_chunks
+from documents.services.prompts import build_prompt
 
-# The LLM that writes answers (generation). Embeddings are local (e5),
-# but generation still uses Gemini.
+logger = logging.getLogger(__name__)
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+_RETRY_DELAYS = [1, 3]  # seconds before attempt 2 and 3
 
-def rag_query(user_query: str, tenant_id: int) -> dict:
+
+def rag_query(user_query: str, tenant_id: int, template: str = "qa") -> dict:
     """
     Full RAG flow for one tenant:
-      1. Retrieve this tenant's most relevant chunks.
-      2. If nothing relevant, return "I don't know" (no hallucinating).
-      3. Build a prompt that forces the LLM to answer ONLY from those chunks.
-      4. Call Gemini to write the answer.
-      5. Return the answer + the chunks it used.
+      1. Retrieve this tenant's most relevant chunks (tenant-isolated).
+      2. If nothing relevant, return honest refusal (no hallucination).
+      3. Build a prompt using the selected template.
+      4. Call Gemini to generate the answer (with retry on 429).
+      5. Return answer + source chunks.
     """
-
-    # 1. Retrieve — note tenant_id is passed through (isolation preserved)
     chunks = retrieve_chunks(user_query, tenant_id=tenant_id)
 
-    # 2. Nothing relevant found → honest refusal
-    # the distance filter in retrieval? If everything was too far away, chunks is empty. Rather than asking the LLM to answer with no context (where it would guess), we short-circuit and honestly say we don't know. This is the anti-hallucination safety net.
     if not chunks:
-        return {"answer": "I don't know based on the available documents.",
-                "context": []}
+        return {"answer": "I don't know based on the available documents.", "context": []}
 
-    # 3. Glue the chunks into one context block, then build a grounded prompt
-    context = "\n\n---\n\n".join(chunks)
+    context_text = "\n\n---\n\n".join(c["content"] for c in chunks)
+    prompt = build_prompt(template, context_text, user_query)
 
-    prompt = f"""You are a helpful assistant. Answer the question using ONLY the context below.
-If the answer is not in the context, say "I don't know based on the available documents."
-Answer in the same language as the question.
+    last_error = None
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            time.sleep(delay)
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+            return {"answer": response.text, "context": chunks}
+        except Exception as exc:
+            err_str = str(exc)
+            if "RESOURCE_EXHAUSTED" in err_str or "429" in err_str:
+                last_error = exc
+                logger.warning("Gemini rate limit hit (attempt %d): %s", attempt + 1, err_str)
+                continue
+            raise
 
-Context:
-{context}
-
-Question: {user_query}
-
-Answer:"""
-
-    # 4. Call Gemini to generate the answer
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-    )
-
-    # 5. Return the answer plus the chunks used (handy for debugging/trust)
-    return {"answer": response.text, "context": chunks}
+    logger.error("Gemini rate limit exceeded after all retries: %s", last_error)
+    return {
+        "error": "Generation rate limit exceeded. Please try again in a moment.",
+        "context": [],
+    }

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 class Tenant(models.Model):
     """One customer/organization. All data is scoped to a tenant."""
     name = models.CharField(max_length=255, unique=True)
+    domain = models.CharField(max_length=255, blank=True, null=True, unique=True)
     api_quota = models.IntegerField(default=1000)
     requests_used = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
